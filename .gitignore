@@ -1,0 +1,6 @@
+# 자료는 GitHub Actions가 만든다 (scripts/build_data.py)
+data/*
+!data/.gitkeep
+.cache/
+__pycache__/
+*.pyc

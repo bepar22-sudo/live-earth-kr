@@ -1,0 +1,54 @@
+# 사이트 만들기: 올릴 때마다 + 10분마다 최신 자료(항공기·발사·위성 궤도)를 받아 GitHub Pages에 올린다.
+name: 사이트 만들기
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 위성 궤도(TLE)는 CelesTrak 요청 규칙에 따라 2시간에 한 번만 새로 받는다 (그 사이에는 저장본 사용)
+      - name: 2시간 단위 표시
+        run: echo "TLE_BUCKET=$(date -u +%Y%m%d)-$(( 10#$(date -u +%H) / 2 ))" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: data/tle_*.txt
+          key: tle-${{ env.TLE_BUCKET }}
+          restore-keys: tle-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 자료 받기
+        run: python scripts/build_data.py
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>지구 실시간 보기</title>
+<meta name="description" content="항공기·국제우주정거장·GPS 위성·지진을 3D 지구에서 실시간으로 보는 교육용 웹 프로그램 (대구과학대학교 측지정보과)">
+<meta property="og:title" content="지구 실시간 보기 · 측지정보과">
+<meta property="og:description" content="항공기·우주정거장·GPS 위성·지진을 3D 지구에서 실시간으로">
+<meta property="og:image" content="assets/icon.png">
+<meta name="theme-color" content="#020812">
+<link rel="icon" href="assets/icon.png">
+<script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.120.0/Build/Cesium/';</script>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.120.0/Build/Cesium/Cesium.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.120.0/Build/Cesium/Widgets/widgets.css">
+<style>
+@font-face{font-family:"Paperlogy";font-weight:400;font-display:swap;src:url("assets/fonts/Paperlogy-4Regular.woff2") format("woff2")}
+@font-face{font-family:"Paperlogy";font-weight:500;font-display:swap;src:url("assets/fonts/Paperlogy-5Medium.woff2") format("woff2")}
+@font-face{font-family:"Paperlogy";font-weight:600;font-display:swap;src:url("assets/fonts/Paperlogy-6SemiBold.woff2") format("woff2")}
+@font-face{font-family:"Paperlogy";font-weight:800;font-display:swap;src:url("assets/fonts/Paperlogy-8ExtraBold.woff2") format("woff2")}
+:root{
+  --bg:rgba(6,14,28,.82); --line:rgba(120,200,255,.24);
+  --ink:#e8f3ff; --dim:#93abc6; --acc:#4fd1ff; --acc2:#ffd25a; --red:#ff5f6d;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#020812;color:var(--ink);font-family:"Paperlogy",sans-serif;overflow:hidden}
+#cesium{position:absolute;inset:0}
+.cesium-viewer-bottom{display:none}
+.panel{position:absolute;background:var(--bg);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 8px 28px rgba(0,0,0,.45)}
+button{font:inherit;color:inherit}
+.btn{background:rgba(79,209,255,.12);border:1px solid rgba(79,209,255,.42);color:var(--ink);border-radius:10px;padding:8px 12px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{background:rgba(79,209,255,.26)}
+.btn.on{background:var(--acc);color:#04121f;border-color:var(--acc)}
+.btn.big{padding:10px 16px;font-size:15px}
+
+/* 머리 */
+#top{left:16px;top:16px;padding:12px 18px 12px 16px}
+.brand{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:#cfe6ff}
+.brand img{height:22px;display:block}
+.brand i{opacity:.45;font-style:normal}
+#top h1{margin:6px 0 0;font-size:24px;font-weight:800;letter-spacing:.5px;line-height:1.15}
+#top h1 small{font-size:11px;font-weight:600;color:var(--acc);letter-spacing:2px;margin-left:8px;vertical-align:middle}
+.clock{display:flex;gap:12px;margin-top:4px;font-size:12.5px;color:var(--dim)}
+.clock b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.live{color:var(--red);font-weight:800;letter-spacing:1px}
+.live:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:5px;vertical-align:1px;animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.2}}
+
+/* 오른쪽 위 단추 */
+#ctrl{position:absolute;right:16px;top:16px;display:flex;gap:8px;z-index:5}
+#ctrl .btn{background:var(--bg);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#ctrl .btn.on{background:var(--acc)}
+
+/* 자료 패널 */
+#layers{right:16px;top:68px;width:290px;padding:14px 16px;max-height:calc(100% - 84px);overflow:auto;z-index:4}
+#layers h2{margin:0 0 8px;font-size:13px;font-weight:800;color:var(--acc);letter-spacing:1px;display:flex;align-items:center}
+#layers h2 .x{margin-left:auto;display:none;background:none;border:0;font-size:22px;line-height:1;color:var(--dim);cursor:pointer}
+.sec{margin-top:14px}
+.lay{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed rgba(120,200,255,.13);font-size:14px;cursor:pointer}
+.lay input{accent-color:var(--acc);width:17px;height:17px}
+.lay .n{margin-left:auto;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.sw{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.sub{font-size:12px;color:var(--dim);margin:3px 0 5px 26px}
+select{background:rgba(0,0,0,.35);color:var(--ink);border:1px solid var(--line);border-radius:7px;font:inherit;font-size:12.5px;padding:4px 6px}
+#search{display:flex;gap:6px}
+#search input{flex:1;min-width:0;background:rgba(0,0,0,.35);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:8px 10px;font:inherit;font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips .btn{padding:6px 10px;font-size:12.5px}
+#launchList .lc{padding:7px 0;border-bottom:1px solid rgba(120,200,255,.1);cursor:pointer;font-size:12.5px}
+#launchList .lc:hover{color:var(--acc)}
+.lc .t{color:var(--acc2);font-variant-numeric:tabular-nums}
+.lc .p{color:var(--dim);font-size:11.5px}
+#status{font-size:11.5px;color:var(--dim);margin-top:12px;line-height:1.55}
+#status .err{color:var(--red)}
+.credit{font-size:11px;color:#6f88a5;margin-top:10px;line-height:1.5}
+.credit a{color:#8fb3d6}
+
+/* 설명 카드(둘러보기) · 정보 카드 */
+.card{left:16px;bottom:calc(16px + var(--safe-b));width:440px;padding:16px 18px 14px;z-index:3;transition:opacity .6s,transform .6s}
+.card.out{opacity:0;transform:translateY(16px);pointer-events:none}
+.tag{display:inline-block;font-size:11.5px;font-weight:800;color:#04121f;background:var(--acc);border-radius:7px;padding:3px 9px;letter-spacing:1px}
+#capH{font-size:21px;font-weight:800;margin-top:9px;line-height:1.25}
+#capBig{font-size:46px;font-weight:800;color:var(--acc2);line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums;word-break:keep-all}
+#capBig:empty{display:none}
+#capSub{font-size:14px;color:#d3e2f2;margin-top:6px;line-height:1.55;word-break:keep-all}
+#capTip{font-size:13px;color:#cfe0f2;margin-top:10px;padding:9px 11px;border-radius:10px;background:rgba(79,209,255,.09);border-left:3px solid var(--acc);line-height:1.55;word-break:keep-all}
+#capTip b{color:var(--acc)}
+.capNav{display:flex;align-items:center;gap:8px;margin-top:12px}
+.dots{display:flex;gap:6px;flex:1}
+.dots i{flex:1;max-width:36px;height:5px;border-radius:3px;background:rgba(255,255,255,.18);cursor:pointer}
+.dots i.on{background:var(--acc)}
+.capNav .btn{padding:6px 10px}
+#info{display:none}
+#info .kind{font-size:11.5px;color:var(--acc);letter-spacing:1px;font-weight:700}
+#info h3{margin:2px 0 0;font-size:19px;font-weight:800}
+#info table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13.5px}
+#info td{padding:4px 0;border-bottom:1px solid rgba(120,200,255,.1);vertical-align:top}
+#info td:first-child{color:var(--dim);width:36%}
+#info td:last-child{font-variant-numeric:tabular-nums}
+#info .row{display:flex;gap:6px;margin-top:10px}
+
+#toast{position:absolute;left:50%;top:84px;transform:translateX(-50%);padding:8px 14px;border-radius:99px;background:rgba(6,14,28,.9);border:1px solid var(--line);font-size:13px;z-index:6;opacity:0;transition:opacity .4s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1}
+#loading{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;font-size:17px;color:var(--acc);background:#020812;z-index:9}
+#loading img{height:28px;opacity:.9}
+
+/* ===== 휴대폰 ===== */
+@media (max-width:720px){
+  #top{left:0;right:0;top:0;border-radius:0;border-width:0 0 1px;padding:calc(8px + env(safe-area-inset-top,0px)) 14px 8px}
+  .brand{font-size:11.5px}.brand img{height:17px}
+  #top h1{font-size:19px;margin-top:3px}#top h1 small{display:none}
+  .clock{font-size:11.5px;gap:10px}
+  #ctrl{top:calc(14px + env(safe-area-inset-top,0px));right:12px;gap:6px}
+  #ctrl .btn{padding:7px 10px;font-size:12.5px}
+  #ctrl .lbl{display:none}
+  #layers{left:0;right:0;top:auto;bottom:0;width:auto;max-height:72%;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + var(--safe-b));transform:translateY(105%);transition:transform .35s}
+  #layers.open{transform:none}
+  #layers h2 .x{display:block}
+  .card{left:8px;right:8px;width:auto;bottom:calc(8px + var(--safe-b));padding:13px 14px 11px;max-height:46%;overflow:auto}
+  #capH{font-size:17px}#capBig{font-size:34px}#capSub{font-size:13px}#capTip{font-size:12px}
+  body.sheet .card{opacity:0;pointer-events:none}
+}
+@media (min-width:721px){ #layers.closed{display:none} }
+</style>
+</head>
+<body>
+<div id="cesium"></div>
+<div id="loading"><img src="assets/logo_white.png" alt="">지구를 불러오는 중…</div>
+
+<header id="top" class="panel">
+  <div class="brand"><img src="assets/logo_white.png" alt="대구과학대학교"><i>|</i>측지정보과</div>
+  <h1>지구 실시간 보기<small>LIVE EARTH</small></h1>
+  <div class="clock"><span class="live">실시간</span><span>한국 <b id="kst">--:--:--</b></span><span>UTC <b id="utc">--:--</b></span></div>
+</header>
+
+<div id="ctrl">
+  <button class="btn on" id="tourBtn" title="자동 둘러보기 (Space)">⏸<span class="lbl"> 둘러보기 멈춤</span></button>
+  <button class="btn" id="layBtn" title="자료·장소·화면 효과">☰<span class="lbl"> 자료</span></button>
+</div>
+
+<aside id="layers" class="panel closed">
+  <h2>실시간 자료 <button class="x" id="layX" aria-label="닫기">×</button></h2>
+  <label class="lay"><input type="checkbox" id="L_flights" checked><span class="sw" style="background:#ffd25a"></span>항공기<span class="n" id="N_flights">–</span></label>
+  <div class="sub" id="flightNote">한반도 주변</div>
+  <label class="lay"><input type="checkbox" id="L_sats" checked><span class="sw" style="background:#4fd1ff"></span>인공위성<span class="n" id="N_sats">–</span></label>
+  <div class="sub">종류 <select id="satGroup">
+    <option value="stations">우주정거장</option>
+    <option value="gps-ops">GPS 위성</option>
+    <option value="visual">맨눈으로 보이는 위성</option>
+    <option value="weather">기상위성</option>
+    <option value="geo">정지궤도 위성</option>
+    <option value="resource">지구관측 위성</option>
+    <option value="starlink">스타링크</option>
+    <option value="active">운용 중인 전체 위성</option>
+  </select></div>
+  <label class="lay"><input type="checkbox" id="L_quakes" checked><span class="sw" style="background:#ff5f6d"></span>지진<span class="n" id="N_quakes">–</span></label>
+  <div class="sub">기간 <select id="qPeriod"><option value="day">최근 1일 (규모 2.5+)</option><option value="week">최근 7일 (규모 4.5+)</option><option value="hour">최근 1시간 (전체)</option></select></div>
+  <label class="lay"><input type="checkbox" id="L_light" checked><span class="sw" style="background:#223"></span>낮·밤 (실제 태양 위치)</label>
+  <label class="lay"><input type="checkbox" id="L_night" checked><span class="sw" style="background:#f6c35a"></span>밤의 도시 불빛</label>
+  <label class="lay"><input type="checkbox" id="L_clouds"><span class="sw" style="background:#fff"></span>NASA 위성사진 (어제)</label>
+  <label class="lay"><input type="checkbox" id="L_labels" checked><span class="sw" style="background:#9ab"></span>지명·국경</label>
+
+  <div class="sec"><h2>장소로 가기</h2>
+    <form id="search"><input id="q" placeholder="대구, 서울 또는 35.87, 128.60" autocomplete="off" enterkeyhint="go"><button class="btn">이동</button></form>
+    <div class="chips">
+      <button class="btn" data-go="earth">지구 전체</button><button class="btn" data-go="korea">한반도</button>
+      <button class="btn" data-go="daegu">대구</button><button class="btn" data-go="icn">인천공항</button>
+      <button class="btn" data-go="iss">우주정거장 따라가기</button>
+    </div>
+  </div>
+
+  <div class="sec"><h2>화면 효과</h2>
+    <div class="chips" id="sensors">
+      <button class="btn on" data-s="0">기본</button><button class="btn" data-s="1">야간투시</button>
+      <button class="btn" data-s="2">열화상</button><button class="btn" data-s="3">CRT</button><button class="btn" data-s="4">흑백</button>
+    </div>
+  </div>
+
+  <div class="sec"><h2>다가오는 로켓 발사</h2><div id="launchList">불러오는 중…</div></div>
+
+  <div id="status"></div>
+  <div class="credit">자료: 위성사진 Esri · 항공기 adsb.lol(ODbL) · 위성 궤도 CelesTrak · 지진 USGS · 야경·구름 NASA GIBS · 발사 The Space Devs<br>
+    교육용입니다. 자료가 늦거나 빠질 수 있어 안전 판단에 쓰지 마세요.</div>
+</aside>
+
+<section id="cap" class="panel card out">
+  <span class="tag" id="capTag"></span>
+  <div id="capH"></div>
+  <div id="capBig"></div>
+  <div id="capSub"></div>
+  <div id="capTip"></div>
+  <div class="capNav">
+    <button class="btn" id="prevBtn" aria-label="이전 장면">◀</button>
+    <div class="dots" id="dots"></div>
+    <button class="btn" id="nextBtn" aria-label="다음 장면">▶</button>
+  </div>
+</section>
+
+<section id="info" class="panel card">
+  <div class="kind" id="iKind"></div>
+  <h3 id="iTitle"></h3>
+  <table id="iTable"></table>
+  <div class="row"><button class="btn" id="iTrack">따라가기</button><button class="btn" id="iClose">닫기</button></div>
+</section>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const C = Cesium;
+C.Ion.defaultAccessToken = '';
+const PHONE = () => innerWidth <= 720;
+const AF = () => innerWidth < innerHeight ? 1.75 : 1;   // 세로 화면이면 더 멀리서 봐야 다 들어옴
+
+// ---------------- 지구 (키 없는 바탕 지도) ----------------
+const viewer = new C.Viewer('cesium', {
+  baseLayer: new C.ImageryLayer(new C.UrlTemplateImageryProvider({
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    maximumLevel: 19, credit: 'Esri, Maxar, Earthstar Geographics' })),
+  baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false, navigationHelpButton: false,
+  animation: false, timeline: false, fullscreenButton: false, infoBox: false, selectionIndicator: false,
+  terrainProvider: new C.EllipsoidTerrainProvider()
+});
+const scene = viewer.scene, globe = scene.globe, layersC = viewer.imageryLayers;
+viewer.clock.currentTime = C.JulianDate.now(); viewer.clock.shouldAnimate = true;
+globe.enableLighting = true; globe.showGroundAtmosphere = false; globe.dynamicAtmosphereLighting = false;
+globe.lightingFadeOutDistance = 6e5; globe.lightingFadeInDistance = 1.5e6;
+globe.nightFadeOutDistance = 6e5; globe.nightFadeInDistance = 1.5e6;
+const yday = new Date(Date.now() - 36 * 3600e3).toISOString().slice(0, 10);
+const cloudLayer = layersC.addImageryProvider(new C.UrlTemplateImageryProvider({
+  url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${yday}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+  maximumLevel: 9, credit: 'NASA GIBS' }));
+cloudLayer.show = false; cloudLayer.alpha = .9;
+const nightLayer = layersC.addImageryProvider(new C.UrlTemplateImageryProvider({
+  url: 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png',
+  maximumLevel: 8, credit: 'NASA Black Marble' }));
+nightLayer.dayAlpha = 0; nightLayer.nightAlpha = 1;
+const labelLayer = layersC.addImageryProvider(new C.UrlTemplateImageryProvider({
+  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  maximumLevel: 19, credit: 'Esri' }));
+
+// ---------------- 공통 ----------------
+const KTS = 0.514444, FT = 0.3048;
+const fmt = (n, d = 0) => Number(n).toLocaleString('ko-KR', { maximumFractionDigits: d, minimumFractionDigits: d });
+const kst = (d, o) => new Date(d).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false, ...o });
+const hhmm = d => kst(d, { hour: '2-digit', minute: '2-digit' });
+const status = {};
+function setStatus(k, msg, err) { status[k] = { msg, err }; $('#status').innerHTML = Object.values(status).map(s => `<div class="${s.err ? 'err' : ''}">${s.msg}</div>`).join(''); }
+let toastT; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+async function getJSON(u) { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status); return r.json(); }
+async function getText(u) { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status); return r.text(); }
+function viewCenter() {
+  const cv = scene.canvas, p = viewer.camera.pickEllipsoid(new C.Cartesian2(cv.clientWidth / 2, cv.clientHeight / 2));
+  const c = p ? C.Cartographic.fromCartesian(p) : viewer.camera.positionCartographic;
+  return { lat: C.Math.toDegrees(c.latitude), lon: C.Math.toDegrees(c.longitude) };
+}
+// 자료 받는 곳: 이 폴더에서 server.py로 열었으면 실시간(api/), GitHub Pages면 data/(약 10분마다 갱신)
+let LIVE = false;
+async function detectLive() { try { const r = await fetch('api/launches', { cache: 'no-cache' }); LIVE = r.ok && (r.headers.get('content-type') || '').includes('json'); } catch (e) { LIVE = false; } }
+
+// ---------------- 선택·따라가기 ----------------
+let selected = null, follow = null;
+const tracker = viewer.entities.add({ position: new C.CallbackProperty(() => selPos(), false),
+  point: { pixelSize: 16, color: C.Color.TRANSPARENT, outlineColor: C.Color.fromCssColorString('#4fd1ff'), outlineWidth: 2, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+tracker.show = false;
+const trail = [];
+viewer.entities.add({ polyline: { positions: new C.CallbackProperty(() => trail.slice(), false), width: 2,
+  material: new C.PolylineGlowMaterialProperty({ glowPower: .25, color: C.Color.fromCssColorString('#4fd1ff') }) } });
+const orbitEnt = viewer.entities.add({ polyline: { positions: [], width: 1.5, material: C.Color.fromCssColorString('#4fd1ff').withAlpha(.6) } });
+
+function selPos() {
+  if (!selected) return undefined;
+  if (selected.kind === 'flight') { const a = flightMap.get(selected.key); return a ? flightPos(a, Date.now() / 1000) : undefined; }
+  if (selected.kind === 'sat') { const s = satList[selected.key]; return s ? satPos(s, new Date()) : undefined; }
+  return selected.pos;
+}
+function select(sel, fromTour) {
+  stopTrack(); selected = sel; trail.length = 0; orbitEnt.polyline.positions = [];
+  tracker.show = !!sel;
+  if (!fromTour) { $('#info').style.display = sel ? 'block' : 'none'; $('#cap').classList.toggle('out', !!sel || !capShown); }
+  $('#iTrack').style.display = sel && (sel.kind === 'flight' || sel.kind === 'sat') ? '' : 'none';
+  if (sel && sel.kind === 'sat') drawOrbit();
+  updateInfo();
+}
+function track() {
+  if (!selected) return;
+  follow = { hpr: selected.kind === 'sat' ? new C.HeadingPitchRange(0, C.Math.toRadians(-35), 2.5e6 * AF()) : new C.HeadingPitchRange(0, C.Math.toRadians(-25), 45000 * AF()), started: false };
+  $('#iTrack').textContent = '멈추기'; $('#iTrack').classList.add('on');
+}
+scene.preRender.addEventListener(() => {
+  if (!follow) return;
+  const p = selPos(); if (!p) return;
+  const cam = viewer.camera;
+  const h = follow.started ? new C.HeadingPitchRange(cam.heading, cam.pitch, C.Cartesian3.magnitude(cam.position)) : follow.hpr;
+  follow.started = true; cam.lookAt(p, h);
+});
+function stopTrack() {
+  if (follow) viewer.camera.lookAtTransform(C.Matrix4.IDENTITY);
+  follow = null; $('#iTrack').textContent = '따라가기'; $('#iTrack').classList.remove('on');
+}
+$('#iTrack').onclick = () => follow ? stopTrack() : track();
+$('#iClose').onclick = () => select(null);
+setInterval(() => { const p = selPos(); if (p && selected && selected.kind === 'flight') { trail.push(p); if (trail.length > 300) trail.shift(); } updateInfo(); }, 1000);
+
+const row = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`;
+function updateInfo() {
+  if (!selected || $('#info').style.display !== 'block') return;
+  const s = selected; let kind = '', title = '', rows = '';
+  if (s.kind === 'flight') {
+    const a = flightMap.get(s.key); if (!a) return;
+    const c = C.Cartographic.fromCartesian(flightPos(a, Date.now() / 1000));
+    kind = a.mil ? '항공기 · 군용 표시' : '항공기'; title = a.cs || a.reg || a.id.toUpperCase();
+    rows = row('기종', (a.type || '–') + (a.desc ? ` <span style="color:var(--dim)">${a.desc}</span>` : '')) + row('등록번호', a.reg || '–') +
+      row('고도', a.gnd ? '지상' : `${fmt(a.alt)} ft (${fmt(a.alt * FT)} m)`) + row('속도', `${fmt(a.gs)} kt (시속 ${fmt(a.gs * 1.852)} km)`) +
+      row('방향', `${fmt(a.trk)}°`) + row('위치', `${C.Math.toDegrees(c.latitude).toFixed(3)}, ${C.Math.toDegrees(c.longitude).toFixed(3)}`) +
+      row('자료 시각', `${hhmm(a.t0 * 1000)}${LIVE ? '' : ' (약 10분마다 갱신)'}`);
+  } else if (s.kind === 'sat') {
+    const st = satList[s.key]; if (!st) return;
+    const now = new Date(), pv = satellite.propagate(st.rec, now), gd = satellite.eciToGeodetic(pv.position, satellite.gstime(now));
+    const v = pv.velocity, spd = Math.hypot(v.x, v.y, v.z);
+    kind = '인공위성'; title = st.name;
+    rows = row('NORAD 번호', st.rec.satnum) + row('고도', `${fmt(gd.height)} km`) + row('속도', `초속 ${fmt(spd, 2)} km`) +
+      row('위치', `${satellite.degreesLat(gd.latitude).toFixed(2)}, ${satellite.degreesLong(gd.longitude).toFixed(2)}`) +
+      row('공전 주기', `${fmt(2 * Math.PI / st.rec.no, 1)} 분`) + row('궤도 경사', `${fmt(C.Math.toDegrees(st.rec.inclo), 1)}°`);
+  } else if (s.kind === 'quake') {
+    const p = s.f.properties, g = s.f.geometry.coordinates;
+    kind = '지진'; title = `규모 ${p.mag?.toFixed(1)} · ${p.place || ''}`;
+    rows = row('발생 시각', kst(p.time) + ' (한국)') + row('깊이', `${fmt(g[2], 1)} km`) + row('위치', `${g[1].toFixed(2)}, ${g[0].toFixed(2)}`) +
+      row('지진해일 경보', p.tsunami ? '<b style="color:var(--red)">있음</b>' : '없음') + row('자세히', `<a href="${p.url}" target="_blank" rel="noopener" style="color:var(--acc)">USGS</a>`);
+  } else if (s.kind === 'launch') {
+    const l = s.l; kind = '로켓 발사 예정'; title = l.name;
+    rows = row('발사 시각', kst(l.net) + ' (한국)') + row('남은 시간', countdown(l.net)) + row('발사 기관', l.provider || '–') + row('장소', l.loc || '–');
+  }
+  $('#iKind').textContent = kind; $('#iTitle').textContent = title; $('#iTable').innerHTML = rows;
+}
+
+// ---------------- 항공기 ----------------
+const planeSvg = 'data:image/svg+xml;utf8,' + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24'><path fill='white' stroke='black' stroke-width='.6' d='M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z'/></svg>");
+const planes = scene.primitives.add(new C.BillboardCollection({ scene }));
+const flightMap = new Map();
+let flightT = 0;
+const COL = { air: C.Color.fromCssColorString('#ffd25a'), mil: C.Color.fromCssColorString('#ff5f6d'), gnd: C.Color.fromCssColorString('#9fb3c8') };
+function flightPos(a, now) {
+  // 실시간(server.py)이면 받은 뒤 90초까지 속도·방향으로 앞으로 옮겨 그림. 묶음 자료(GitHub)는 받은 시각 위치 그대로.
+  const dt = a.gnd || !LIVE ? 0 : Math.min(90, Math.max(0, now - a.t0));
+  const d = a.gs * KTS * dt, tr = C.Math.toRadians(a.trk);
+  const lat = a.lat + (d * Math.cos(tr)) / 111320, lon = a.lon + (d * Math.sin(tr)) / (111320 * Math.cos(C.Math.toRadians(a.lat)));
+  return C.Cartesian3.fromDegrees(lon, lat, a.gnd ? 5 : a.alt * FT);
+}
+async function loadFlights() {
+  if (!$('#L_flights').checked) return;
+  try {
+    let d;
+    if (LIVE) {
+      let c = viewCenter();
+      if (selected && selected.kind === 'flight') { const p = selPos(); if (p) { const g = C.Cartographic.fromCartesian(p); c = { lat: C.Math.toDegrees(g.latitude), lon: C.Math.toDegrees(g.longitude) }; } }
+      d = await getJSON(`api/flights?lat=${c.lat.toFixed(2)}&lon=${c.lon.toFixed(2)}&dist=250`);
+    } else d = await getJSON('data/flights.json');
+    flightT = d.t;
+    const seen = new Set();
+    for (const a of d.ac) {
+      seen.add(a.id); a.t0 = d.t - (a.seen || 0);
+      let o = flightMap.get(a.id);
+      if (!o) { o = a; o.bb = planes.add({ image: planeSvg, scale: .42, alignedAxis: C.Cartesian3.UNIT_Z, id: { kind: 'flight', key: a.id },
+        scaleByDistance: new C.NearFarScalar(2e4, 1.4, 6e6, .35) }); flightMap.set(a.id, o); }
+      else { const bb = o.bb; Object.assign(o, a); o.bb = bb; }
+      o.bb.rotation = -C.Math.toRadians(o.trk); o.bb.color = o.mil ? COL.mil : o.gnd ? COL.gnd : COL.air;
+      o.bb.position = flightPos(o, Date.now() / 1000);
+    }
+    for (const [id, o] of flightMap) if (!seen.has(id) && !(selected && selected.key === id)) { planes.remove(o.bb); flightMap.delete(id); }
+    $('#N_flights').textContent = fmt(d.ac.length) + '대';
+    const age = Math.max(0, Math.round((Date.now() / 1000 - d.t) / 60));
+    $('#flightNote').textContent = LIVE ? '화면 중심 반경 약 460km · 10초마다' : `한반도 주변 · ${hhmm(d.t * 1000)} 기준 (약 ${age}분 전)`;
+    setStatus('f', `항공기 ${hhmm(d.t * 1000)} 기준 (adsb.lol)`);
+  } catch (e) { setStatus('f', `항공기 자료를 받지 못함 (${e.message})`, true); }
+}
+scene.preRender.addEventListener(() => { if (LIVE && planes.show) { const now = Date.now() / 1000; for (const o of flightMap.values()) o.bb.position = flightPos(o, now); } });
+$('#L_flights').onchange = e => { planes.show = e.target.checked; if (e.target.checked) loadFlights(); };
+
+// ---------------- 인공위성 ----------------
+const satPts = scene.primitives.add(new C.PointPrimitiveCollection());
+let satList = [];
+function satPos(s, date) {
+  const pv = satellite.propagate(s.rec, date); if (!pv.position) return undefined;
+  const e = satellite.eciToEcf(pv.position, satellite.gstime(date));
+  return new C.Cartesian3(e.x * 1000, e.y * 1000, e.z * 1000);
+}
+async function tleText(g) {
+  const tries = LIVE ? [`api/sats?group=${g}`, `data/tle_${g}.txt`] : [`data/tle_${g}.txt`];
+  tries.push(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${g}&FORMAT=tle`);
+  for (const u of tries) { try { const t = await getText(u); if (t.includes('\n1 ')) return t; } catch (e) {} }
+  throw new Error('궤도 자료 없음');
+}
+async function loadSats() {
+  const g = $('#satGroup').value;
+  setStatus('s', '위성 궤도 자료 받는 중…');
+  try {
+    const lines = (await tleText(g)).split(/\r?\n/).map(l => l.trimEnd()).filter(Boolean);
+    satPts.removeAll(); satList = [];
+    if (selected && selected.kind === 'sat') select(null);
+    for (let i = 0; i + 2 < lines.length + 1; i += 3) {
+      if (!lines[i + 2]) break;
+      const rec = satellite.twoline2satrec(lines[i + 1], lines[i + 2]), name = lines[i].trim();
+      const iss = /ISS \(ZARYA\)/.test(name), css = /CSS \(TIANHE\)/.test(name);
+      const pt = satPts.add({ pixelSize: iss || css ? 10 : g === 'gps-ops' ? 8 : (g === 'active' || g === 'starlink' ? 3 : 5),
+        color: iss ? C.Color.WHITE : C.Color.fromCssColorString('#4fd1ff').withAlpha(.9),
+        outlineColor: C.Color.BLACK.withAlpha(.6), outlineWidth: 1, id: { kind: 'sat', key: satList.length } });
+      satList.push({ name, rec, pt });
+    }
+    updateSats();
+    $('#N_sats').textContent = fmt(satList.length) + '개';
+    setStatus('s', `위성 ${fmt(satList.length)}개 궤도 계산 중 (CelesTrak)`);
+  } catch (e) { setStatus('s', `위성 자료를 받지 못함 (${e.message})`, true); }
+}
+function updateSats() {
+  if (!satPts.show) return;
+  const now = new Date();
+  for (const s of satList) { const p = satPos(s, now); if (p) { s.pt.position = p; s.pt.show = true; } else s.pt.show = false; }
+}
+function orbitPts(rec, steps = 180) {
+  const per = 2 * Math.PI / rec.no, now = Date.now(), gmst = satellite.gstime(new Date()), pts = [];
+  for (let m = 0; m <= per; m += per / steps) { const pv = satellite.propagate(rec, new Date(now + m * 60e3)); if (!pv.position) continue;
+    const e = satellite.eciToEcf(pv.position, gmst); pts.push(new C.Cartesian3(e.x * 1e3, e.y * 1e3, e.z * 1e3)); }
+  return pts;
+}
+function drawOrbit() { const s = satList[selected.key]; if (s) orbitEnt.polyline.positions = orbitPts(s.rec); }
+setInterval(() => { updateSats(); if (selected && selected.kind === 'sat') drawOrbit(); }, 2000);
+$('#satGroup').onchange = loadSats;
+$('#L_sats').onchange = e => { satPts.show = e.target.checked; updateSats(); };
+
+// ---------------- 지진 ----------------
+const qPts = scene.primitives.add(new C.PointPrimitiveCollection());
+const qLabels = scene.primitives.add(new C.LabelCollection());
+let quakeFeatures = [];
+const depthColor = km => C.Color.fromCssColorString(km < 70 ? '#ff4d5e' : km < 300 ? '#ff9f43' : '#ffe066');
+async function loadQuakes() {
+  const feed = { day: '2.5_day', week: '4.5_week', hour: 'all_hour' }[$('#qPeriod').value];
+  try {
+    const d = await getJSON(`https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/${feed}.geojson`);
+    qPts.removeAll(); qLabels.removeAll(); quakeFeatures = d.features;
+    for (const f of d.features) {
+      const [lon, lat, dep] = f.geometry.coordinates, m = f.properties.mag || 0, pos = C.Cartesian3.fromDegrees(lon, lat, 0);
+      qPts.add({ position: pos, pixelSize: 5 + Math.max(0, m) * 3.2, color: depthColor(dep).withAlpha(.75), outlineColor: C.Color.WHITE.withAlpha(.8), outlineWidth: 1, id: { kind: 'quake', f, pos } });
+      if (m >= 5) qLabels.add({ position: pos, text: `M${m.toFixed(1)}`, font: '600 13px Paperlogy', fillColor: C.Color.WHITE, outlineColor: C.Color.BLACK,
+        outlineWidth: 3, style: C.LabelStyle.FILL_AND_OUTLINE, pixelOffset: new C.Cartesian2(0, -18), distanceDisplayCondition: new C.DistanceDisplayCondition(0, 2.5e7) });
+    }
+    $('#N_quakes').textContent = fmt(d.features.length) + '건';
+    setStatus('q', `지진 ${hhmm(Date.now())} 갱신 (USGS)`);
+  } catch (e) { setStatus('q', `지진 자료를 받지 못함 (${e.message})`, true); }
+}
+$('#qPeriod').onchange = loadQuakes;
+$('#L_quakes').onchange = e => { qPts.show = qLabels.show = e.target.checked; };
+
+// ---------------- 로켓 발사 ----------------
+let launches = [];
+function countdown(net) {
+  let s = Math.round((new Date(net) - Date.now()) / 1000); const neg = s < 0; s = Math.abs(s);
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+  const t = (d ? `${d}일 ` : '') + `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  return neg ? `발사 ${t} 지남` : `${t} 남음`;
+}
+async function loadLaunches() {
+  const tries = LIVE ? ['api/launches', 'data/launches.json'] : ['data/launches.json'];
+  for (const u of tries) { try { launches = (await getJSON(u)).launches; break; } catch (e) {} }
+  if (!launches.length) { try { const r = await getJSON('https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=12&mode=list');
+    launches = r.results.map(l => ({ name: l.name, net: l.net, provider: l.lsp_name || '', loc: l.location || '', lat: l.latitude ? +l.latitude : null, lon: l.longitude ? +l.longitude : null })); } catch (e) {} }
+  $('#launchList').innerHTML = launches.length ? launches.map((l, i) => `<div class="lc" data-i="${i}"><div>${l.name}</div><div class="t" data-net="${l.net}">${countdown(l.net)}</div><div class="p">${kst(l.net, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · ${l.provider}</div></div>`).join('') : '발사 일정을 받지 못했습니다.';
+  document.querySelectorAll('.lc').forEach(el => el.onclick = () => {
+    const l = launches[+el.dataset.i]; if (l.lat == null) return;
+    userTakeover(); closeSheet(); const pos = C.Cartesian3.fromDegrees(l.lon, l.lat); select({ kind: 'launch', l, pos });
+    viewer.camera.flyTo({ destination: C.Cartesian3.fromDegrees(l.lon, l.lat, 60000 * AF()), duration: 2.5 });
+  });
+}
+setInterval(() => document.querySelectorAll('.lc .t').forEach(el => el.textContent = countdown(el.dataset.net)), 1000);
+
+// ---------------- 지도 층 ----------------
+$('#L_light').onchange = e => { globe.enableLighting = e.target.checked; };
+$('#L_clouds').onchange = e => { cloudLayer.show = e.target.checked; };
+$('#L_night').onchange = e => { if (e.target.checked) $('#L_light').checked = globe.enableLighting = true; };
+$('#L_labels').onchange = e => { labelLayer.show = e.target.checked; };
+scene.preRender.addEventListener(() => { nightLayer.show = $('#L_night').checked && globe.enableLighting && viewer.camera.positionCartographic.height > 7e5; });
+
+// ---------------- 화면 효과 ----------------
+const head = `uniform sampler2D colorTexture; uniform float time; in vec2 v_textureCoordinates;
+float rnd(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233))+time)*43758.5453);}
+float lum(vec3 c){return dot(c,vec3(.299,.587,.114));}
+float vig(vec2 uv){vec2 d=uv-.5;return 1.-dot(d,d)*1.4;}`;
+const shaders = [null,
+  head + `void main(){vec2 uv=v_textureCoordinates;float l=lum(texture(colorTexture,uv).rgb);l=pow(l,.8)*1.5+rnd(uv)*.12;out_FragColor=vec4(vec3(.25,1.,.35)*l*vig(uv),1.);}`,
+  head + `vec3 iron(float t){return vec3(smoothstep(.12,.6,t), smoothstep(.5,.92,t), smoothstep(0.,.3,t)*(1.-smoothstep(.35,.6,t))+smoothstep(.88,1.,t));}
+    void main(){vec2 uv=v_textureCoordinates;float l=pow(lum(texture(colorTexture,uv).rgb),.6);out_FragColor=vec4(iron(l)*vig(uv)+rnd(uv)*.03,1.);}`,
+  head + `void main(){vec2 uv=v_textureCoordinates;float r=texture(colorTexture,uv+vec2(.0015,0)).r,g=texture(colorTexture,uv).g,b=texture(colorTexture,uv-vec2(.0015,0)).b;
+    float s=.85+.15*sin(uv.y*900.);out_FragColor=vec4(vec3(r,g,b)*s*vig(uv)*1.1+rnd(uv)*.04,1.);}`,
+  head + `void main(){vec2 uv=v_textureCoordinates;float l=smoothstep(.05,.9,lum(texture(colorTexture,uv).rgb));out_FragColor=vec4(vec3(l)*vig(uv)+rnd(uv)*.03,1.);}`
+];
+const stages = shaders.map(s => s && scene.postProcessStages.add(new C.PostProcessStage({ fragmentShader: s, uniforms: { time: () => (performance.now() / 1000) % 100 } })));
+function setSensor(i) { stages.forEach((st, k) => { if (st) st.enabled = k === i; }); document.querySelectorAll('#sensors .btn').forEach(b => b.classList.toggle('on', +b.dataset.s === i)); }
+document.querySelectorAll('#sensors .btn').forEach(b => b.onclick = () => setSensor(+b.dataset.s));
+setSensor(0);
+
+// ---------------- 장소 이동 ----------------
+const PLACES = { '서울': [37.5665, 126.978], '부산': [35.1796, 129.0756], '대구': [35.8714, 128.6014], '인천': [37.4563, 126.7052], '광주': [35.1595, 126.8526],
+  '대전': [36.3504, 127.3845], '울산': [35.5384, 129.3114], '제주': [33.4996, 126.5312], '독도': [37.2412, 131.8647], '인천공항': [37.4602, 126.4407],
+  '김포공항': [37.5583, 126.7906], '대구공항': [35.8941, 128.6589], '도쿄': [35.6762, 139.6503], '베이징': [39.9042, 116.4074], '뉴욕': [40.7128, -74.006],
+  '런던': [51.5074, -0.1278], '파리': [48.8566, 2.3522], '시드니': [-33.8688, 151.2093], '두바이': [25.2048, 55.2708] };
+function flyTo(lat, lon, h) { stopTrack(); viewer.camera.flyTo({ destination: C.Cartesian3.fromDegrees(lon, lat, h), duration: 2.5 }); }
+const GO = {
+  earth: () => flyTo(30, 128, 2.2e7 * AF()), korea: () => flyTo(36.2, 127.8, 1.4e6 * AF()), daegu: () => flyTo(35.8714, 128.6014, 120000 * AF()),
+  icn: () => flyTo(37.4602, 126.4407, 40000 * AF()),
+  iss: async () => { if ($('#satGroup').value !== 'stations' || !satList.length) { $('#satGroup').value = 'stations'; await loadSats(); }
+    const i = satList.findIndex(s => /ISS \(ZARYA\)/.test(s.name)); if (i >= 0) { select({ kind: 'sat', key: i }); track(); } }
+};
+document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { userTakeover(); closeSheet(); GO[b.dataset.go](); });
+$('#search').onsubmit = e => {
+  e.preventDefault(); userTakeover(); const q = $('#q').value.trim().replace(/^geo:/, '');
+  const m = q.match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
+  if (m) { closeSheet(); return flyTo(+m[1], +m[2], 80000 * AF()); }
+  const k = Object.keys(PLACES).find(n => n === q) || Object.keys(PLACES).find(n => n.includes(q) || q.includes(n));
+  if (k) { closeSheet(); $('#q').blur(); return flyTo(...PLACES[k], (k.endsWith('공항') ? 40000 : 150000) * AF()); }
+  $('#q').value = ''; $('#q').placeholder = '찾지 못했습니다. 위도, 경도로 입력해 보세요';
+};
+
+// ---------------- 자료 패널(휴대폰은 아래 서랍) ----------------
+function openSheet() { $('#layers').classList.remove('closed'); $('#layers').classList.add('open'); $('#layBtn').classList.add('on'); if (PHONE()) document.body.classList.add('sheet'); }
+function closeSheet() { if (!PHONE()) return; $('#layers').classList.remove('open'); $('#layBtn').classList.remove('on'); document.body.classList.remove('sheet'); }
+$('#layBtn').onclick = () => {
+  const L = $('#layers');
+  if (PHONE()) L.classList.contains('open') ? closeSheet() : openSheet();
+  else { const shut = L.classList.toggle('closed'); $('#layBtn').classList.toggle('on', !shut); }
+};
+$('#layX').onclick = closeSheet;
+if (!PHONE()) openSheet();
+
+// ---------------- 누르기 ----------------
+new C.ScreenSpaceEventHandler(scene.canvas).setInputAction(ev => {
+  const p = scene.pick(ev.position);
+  if (p && p.id && p.id.kind) {
+    userTakeover(); closeSheet();
+    const id = p.id;
+    select(id.kind === 'quake' ? { kind: 'quake', f: id.f, pos: id.pos } : id.kind === 'launch' ? { kind: 'launch', l: id.l, pos: id.pos } : { kind: id.kind, key: id.key });
+  }
+}, C.ScreenSpaceEventType.LEFT_CLICK);
+
+// ---------------- 자동 둘러보기 ----------------
+let tourOn = false, tourIdx = 0, tourGen = 0, capShown = false, spin = 0, tempOrbits = [];
+class Stop extends Error {}
+scene.preRender.addEventListener(() => { if (tourOn && spin && !follow) viewer.camera.rotate(C.Cartesian3.UNIT_Z, -spin); });
+function capSet(tag, h, big, sub, tip) {
+  $('#capTag').textContent = tag; $('#capH').textContent = h; $('#capBig').textContent = big; $('#capSub').innerHTML = sub; $('#capTip').innerHTML = '<b>알아보기</b> · ' + tip;
+  $('#dots').innerHTML = SCENES.map((_, i) => `<i class="${i === tourIdx ? 'on' : ''}" data-i="${i}"></i>`).join('');
+}
+function reset() {
+  stopTrack(); select(null, true); spin = 0; globe.enableLighting = $('#L_light').checked;
+  tempOrbits.forEach(e => viewer.entities.remove(e)); tempOrbits = [];
+}
+async function useSats(T, g) { if ($('#satGroup').value !== g || !satList.length) { $('#satGroup').value = g; await T.do(loadSats()); } }
+
+const SCENES = [
+  async function korea(T) {
+    reset(); flyTo(36.1, 127.9, 2.3e6 * AF()); await T.wait(2800); await T.do(loadFlights());
+    const sub = () => LIVE ? '노랑 비행 중 · 회색 지상 · 빨강 군용 표시<br>10초마다 새 위치' : `노랑 비행 중 · 회색 지상 · 빨강 군용 표시<br>${hhmm(flightT * 1000)} 기준 위치 (약 10분마다 갱신)`;
+    await T.cap('실시간 항공기', '지금 한반도 하늘의 비행기', `${fmt(flightMap.size)}대`, sub(),
+      '비행기는 자기 위치·고도·속도를 1초에 여러 번 전파로 알립니다(<b>ADS-B</b>). 세계 곳곳의 자원봉사 수신기가 이 신호를 모아 공개합니다.');
+    await T.live(24000, () => { $('#capBig').textContent = `${fmt(flightMap.size)}대`; }, 3000);
+  },
+  async function oneFlight(T) {
+    reset();
+    if (!flightMap.size) { flyTo(36.1, 127.9, 2.3e6 * AF()); await T.wait(2800); await T.do(loadFlights()); }
+    const c = viewCenter();
+    const cand = [...flightMap.values()].filter(a => !a.gnd && a.cs && a.alt > 15000 && a.gs > 250)
+      .sort((a, b) => Math.hypot(a.lat - c.lat, a.lon - c.lon) - Math.hypot(b.lat - c.lat, b.lon - c.lon));
+    const a = cand[Math.floor(Math.random() * Math.min(6, cand.length))]; if (!a) return;
+    select({ kind: 'flight', key: a.id }, true); track(); await T.wait(1500);
+    const sub = () => { const o = flightMap.get(a.id) || a; return `${o.type || '기종 미상'} · 고도 ${fmt(o.alt * FT)}m · 시속 ${fmt(o.gs * 1.852)}km<br>방향 ${fmt(o.trk)}° · 등록번호 ${o.reg || '–'}`; };
+    await T.cap('비행기 따라가기', '지금 날고 있는 이 비행기', a.cs, sub(),
+      '순항 고도 약 10km는 공기가 희박해 연료를 아낄 수 있는 높이입니다. 항공에서는 <b>1피트 = 0.3048m</b>, <b>1노트 = 시속 1.852km</b>를 씁니다.');
+    await T.live(26000, () => { $('#capSub').innerHTML = sub(); });
+  },
+  async function iss(T) {
+    reset(); await useSats(T, 'stations');
+    const k = satList.findIndex(s => /ISS \(ZARYA\)/.test(s.name)); if (k < 0) return;
+    select({ kind: 'sat', key: k }, true); track(); await T.wait(1500);
+    const info = () => {
+      const now = new Date(), pv = satellite.propagate(satList[k].rec, now), gd = satellite.eciToGeodetic(pv.position, satellite.gstime(now));
+      const v = pv.velocity, lat = satellite.degreesLat(gd.latitude), lon = satellite.degreesLong(gd.longitude);
+      return [`고도 ${fmt(gd.height)}km`, `초속 ${fmt(Math.hypot(v.x, v.y, v.z), 1)}km · 지구 한 바퀴 약 ${fmt(2 * Math.PI / satList[k].rec.no)}분<br>지금 위치 ${lat >= 0 ? '북위' : '남위'} ${Math.abs(lat).toFixed(1)}° · ${lon >= 0 ? '동경' : '서경'} ${Math.abs(lon).toFixed(1)}°`];
+    };
+    await T.cap('국제우주정거장 ISS', '사람이 사는 우주 실험실', ...info(),
+      '약 93분에 지구를 한 바퀴 돌아 하루에 해돋이를 16번 봅니다. 위성 위치는 <b>2줄 궤도요소(TLE)</b>와 궤도 계산식(SGP4)으로 구합니다.');
+    await T.live(28000, () => { const [b, s] = info(); $('#capBig').textContent = b; $('#capSub').innerHTML = s; });
+  },
+  async function gps(T) {
+    reset(); await useSats(T, 'gps-ops'); globe.enableLighting = false;
+    for (const s of satList) tempOrbits.push(viewer.entities.add({ polyline: { positions: orbitPts(s.rec, 120), width: 2, material: C.Color.fromCssColorString('#4fd1ff').withAlpha(.35) } }));
+    flyTo(25, 128, 5.0e7 * AF()); await T.wait(3000); spin = 0.0006;
+    const obs = { latitude: C.Math.toRadians(35.87), longitude: C.Math.toRadians(128.6), height: 0.05 };
+    const vis = () => { const now = new Date(), g = satellite.gstime(now); let n = 0;
+      for (const s of satList) { const pv = satellite.propagate(s.rec, now); if (!pv.position) continue;
+        if (satellite.ecfToLookAngles(obs, satellite.eciToEcf(pv.position, g)).elevation > C.Math.toRadians(10)) n++; } return n; };
+    const sub = () => `대구 하늘에 지금 보이는 위성 <b style="color:var(--acc2)">${vis()}개</b> (고도각 10° 이상)<br>고도 약 20,200km · 6개 궤도면에 나뉘어 돕니다`;
+    await T.cap('측지정보과 · GNSS', '지구를 도는 GPS 위성', `${satList.length}개`, sub(),
+      '수신기는 전파가 오는 시간으로 위성까지의 거리를 잽니다. 위성 <b>4개 이상</b>이면 위도·경도·높이와 수신기 시계 오차를 함께 풀 수 있습니다 — 측량에서 쓰는 GNSS의 원리입니다.');
+    await T.live(28000, () => { $('#capSub').innerHTML = sub(); }, 5000);
+  },
+  async function quakes(T) {
+    reset(); $('#qPeriod').value = 'day'; await T.do(loadQuakes()); globe.enableLighting = false;
+    flyTo(15, 160, 1.9e7 * AF()); await T.wait(3000); spin = 0.0005;
+    const f = [...quakeFeatures].sort((a, b) => (b.properties.mag || 0) - (a.properties.mag || 0)), top = f[0] && f[0].properties;
+    const sub = top ? `가장 큰 지진 규모 <b style="color:var(--acc2)">${top.mag.toFixed(1)}</b> · ${top.place}<br>${kst(top.time, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} (한국 시각) · 원 크기는 규모, 색은 깊이` : '자료를 받는 중입니다';
+    await T.cap('미국 지질조사국 USGS', '최근 24시간 세계의 지진', `${f.length}건`, sub,
+      '지진은 판의 경계에 몰려 있습니다 — 태평양을 둘러싼 <b>불의 고리</b>. 규모가 1 커지면 나오는 에너지는 약 <b>32배</b>가 됩니다.');
+    await T.wait(25000);
+  },
+  async function dayNight(T) {
+    reset(); if (!launches.length) await T.do(loadLaunches());
+    const d = new Date(), subsolar = (12 - (d.getUTCHours() + d.getUTCMinutes() / 60)) * 15;
+    flyTo(20, ((subsolar + 70 + 540) % 360) - 180, 2.4e7 * AF()); await T.wait(3000); spin = 0.0005;
+    const next = launches.find(l => new Date(l.net) > Date.now());
+    const sub = () => next ? `다음 로켓 발사 · ${next.name}<br>${next.provider} · <b style="color:var(--acc2)">${countdown(next.net)}</b>` : '밤 쪽에 보이는 불빛은 도시의 불빛입니다';
+    await T.cap('실제 태양 위치', '지금 지구의 낮과 밤', '', sub(),
+      '낮과 밤의 경계(명암 경계선)는 지구 자전 때문에 <b>1시간에 경도 15°</b>씩 서쪽으로 움직입니다. 그래서 경도 15°마다 표준시가 1시간씩 다릅니다.');
+    await T.live(26000, () => { $('#capSub').innerHTML = sub(); });
+  },
+];
+function runTour(start = tourIdx) {
+  const g = ++tourGen; tourOn = true; updTourBtn(); $('#info').style.display = 'none';
+  const T = {
+    wait: ms => new Promise((res, rej) => setTimeout(() => g === tourGen ? res() : rej(new Stop()), ms)),
+    do: async p => { const r = await p; if (g !== tourGen) throw new Stop(); return r; },
+    live: async (ms, fn, every = 1000) => { const end = Date.now() + ms; while (Date.now() < end) { try { fn(); } catch (e) {} await T.wait(every); } },
+    cap: async (...a) => { const c = $('#cap'); c.classList.add('out'); await T.wait(600); capSet(...a); capShown = true; c.classList.remove('out'); },
+  };
+  (async () => {
+    let i = start;
+    for (;;) {
+      tourIdx = ((i % SCENES.length) + SCENES.length) % SCENES.length;
+      try { await SCENES[tourIdx](T); }
+      catch (e) { if (e instanceof Stop) return; console.warn('장면 오류', e); try { await T.wait(1500); } catch (x) { return; } }
+      i++;
+    }
+  })();
+}
+function stopTour() { if (!tourOn) return; tourGen++; tourOn = false; spin = 0; updTourBtn(); }
+function updTourBtn() { const b = $('#tourBtn'); b.classList.toggle('on', tourOn); b.innerHTML = tourOn ? '⏸<span class="lbl"> 둘러보기 멈춤</span>' : '▶<span class="lbl"> 자동 둘러보기</span>'; }
+function userTakeover() { if (tourOn) { stopTour(); stopTrack(); toast('직접 탐색 중 · ▶ 를 누르면 다시 자동으로 둘러봅니다'); } }
+$('#tourBtn').onclick = () => { if (tourOn) { stopTour(); toast('둘러보기를 멈췄습니다. 지구를 직접 돌려 보세요'); } else { closeSheet(); select(null, true); runTour(tourIdx); } };
+$('#nextBtn').onclick = () => { closeSheet(); runTour(tourIdx + 1); };
+$('#prevBtn').onclick = () => { closeSheet(); runTour(tourIdx - 1); };
+$('#dots').onclick = e => { const i = e.target.dataset && e.target.dataset.i; if (i != null) runTour(+i); };
+// 지구를 손으로 만지면 둘러보기를 멈추고 직접 탐색
+['pointerdown', 'wheel', 'touchstart'].forEach(t => scene.canvas.addEventListener(t, () => userTakeover(), { passive: true }));
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Escape') stopTrack();
+  if (e.key === ' ') { e.preventDefault(); $('#tourBtn').click(); }
+  if ('12345'.includes(e.key)) setSensor(+e.key - 1);
+});
+
+// ---------------- 시계 ----------------
+setInterval(() => { const d = new Date(); $('#kst').textContent = kst(d, { hour: '2-digit', minute: '2-digit', second: '2-digit' }); $('#utc').textContent = d.toISOString().slice(11, 16); viewer.clock.currentTime = C.JulianDate.now(); }, 1000);
+
+// ---------------- 시작 ----------------
+viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(128, 33, 1.6e7 * AF()) });
+globe.tileLoadProgressEvent.addEventListener(n => { if (n === 0) $('#loading').style.display = 'none'; });
+setTimeout(() => $('#loading').style.display = 'none', 7000);
+(async () => {
+  await detectLive();
+  loadQuakes(); loadLaunches(); await loadSats();
+  setInterval(loadFlights, LIVE ? 10000 : 120000);
+  setInterval(loadQuakes, 60000);
+  if (LIVE) { let t; viewer.camera.moveEnd.addEventListener(() => { clearTimeout(t); t = setTimeout(loadFlights, 600); }); }
+  const start = new URLSearchParams(location.search).get('scene');
+  if (new URLSearchParams(location.search).get('tour') === '0') { tourOn = false; updTourBtn(); GO.korea(); loadFlights(); }
+  else runTour(start ? +start : 0);
+})();
+</script>
+</body>
+</html>
