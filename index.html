@@ -91,7 +91,7 @@ select{background:rgba(0,0,0,.35);color:var(--ink);border:1px solid var(--line);
 .dots{display:flex;gap:6px;flex:1}
 .dots i{flex:1;max-width:36px;height:5px;border-radius:3px;background:rgba(255,255,255,.18);cursor:pointer}
 .dots i.on{background:var(--acc)}
-.capNav .btn{padding:6px 10px}
+.capNav .btn{min-width:44px;padding:7px 12px;font-size:16px}
 #info{display:none}
 #info .kind{font-size:11.5px;color:var(--acc);letter-spacing:1px;font-weight:700}
 #info h3{margin:2px 0 0;font-size:19px;font-weight:800}
@@ -112,14 +112,23 @@ select{background:rgba(0,0,0,.35);color:var(--ink);border:1px solid var(--line);
   .brand{font-size:11.5px}.brand img{height:17px}
   #top h1{font-size:19px;margin-top:3px}#top h1 small{display:none}
   .clock{font-size:11.5px;gap:10px}
-  #ctrl{top:calc(14px + env(safe-area-inset-top,0px));right:12px;gap:6px}
-  #ctrl .btn{padding:7px 10px;font-size:12.5px}
-  #ctrl .lbl{display:none}
+  #ctrl{top:calc(12px + env(safe-area-inset-top,0px));right:10px;gap:6px}
+  #ctrl .btn{min-height:46px;padding:0 13px;font-size:15px;font-weight:800;border-radius:12px;border-width:1.5px}
+  .clock .utc{display:none}
   #layers{left:0;right:0;top:auto;bottom:0;width:auto;max-height:72%;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + var(--safe-b));transform:translateY(105%);transition:transform .35s}
   #layers.open{transform:none}
   #layers h2 .x{display:block}
-  .card{left:8px;right:8px;width:auto;bottom:calc(8px + var(--safe-b));padding:13px 14px 11px;max-height:46%;overflow:auto}
-  #capH{font-size:17px}#capBig{font-size:34px}#capSub{font-size:13px}#capTip{font-size:12px}
+  .card{left:8px;right:8px;width:auto;bottom:calc(8px + var(--safe-b));padding:10px 12px 9px;max-height:38%;overflow:auto;border-radius:12px}
+  .tag{font-size:10.5px;padding:2px 7px}
+  #capH{font-size:14.5px;margin-top:5px}#capBig{font-size:24px;margin-top:1px}#capSub{font-size:12px;margin-top:3px;line-height:1.45}
+  #capTip{font-size:11.5px;margin-top:6px;padding:6px 9px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;max-height:calc(2.9em + 12px)}
+  #cap.tipopen #capTip{display:block;max-height:none}
+  .capNav{margin-top:8px;gap:10px}
+  .capNav .btn{min-width:58px;min-height:44px;font-size:20px;padding:0;border-radius:12px}
+  .dots i{height:6px}
+  #info h3{font-size:16px}#info .kind{font-size:10.5px}
+  #info table{font-size:12px;margin-top:5px}#info td{padding:2.5px 0}
+  #info .row .btn{min-height:42px;flex:1;font-size:14px}
   body.sheet .card{opacity:0;pointer-events:none}
 }
 @media (min-width:721px){ #layers.closed{display:none} }
@@ -132,12 +141,12 @@ select{background:rgba(0,0,0,.35);color:var(--ink);border:1px solid var(--line);
 <header id="top" class="panel">
   <div class="brand"><img src="assets/logo_white.png" alt="대구과학대학교"><i>|</i>측지정보과</div>
   <h1>지구 실시간 보기<small>LIVE EARTH</small></h1>
-  <div class="clock"><span class="live">실시간</span><span>한국 <b id="kst">--:--:--</b></span><span>UTC <b id="utc">--:--</b></span></div>
+  <div class="clock"><span class="live">실시간</span><span>한국 <b id="kst">--:--:--</b></span><span class="utc">UTC <b id="utc">--:--</b></span></div>
 </header>
 
 <div id="ctrl">
-  <button class="btn on" id="tourBtn" title="자동 둘러보기 (Space)">⏸<span class="lbl"> 둘러보기 멈춤</span></button>
-  <button class="btn" id="layBtn" title="자료·장소·화면 효과">☰<span class="lbl"> 자료</span></button>
+  <button class="btn on" id="tourBtn" title="자동 둘러보기 (Space)">⏸ 멈춤</button>
+  <button class="btn" id="layBtn" title="자료·장소·화면 효과">☰ 자료</button>
 </div>
 
 <aside id="layers" class="panel closed">
@@ -279,6 +288,10 @@ function selPos() {
 }
 function select(sel, fromTour) {
   stopTrack(); selected = sel; trail.length = 0; orbitEnt.polyline.positions = [];
+  if (sel && sel.kind === 'flight') {  // 지나온 길 3분을 미리 그려 둠 (속도·방향으로 추정)
+    const a = flightMap.get(sel.key), now = Date.now() / 1000;
+    if (a && !a.gnd) for (let k = 180; k > 0; k -= 6) trail.push(flightPos(a, now - k));
+  }
   tracker.show = !!sel;
   if (!fromTour) { $('#info').style.display = sel ? 'block' : 'none'; $('#cap').classList.toggle('out', !!sel || !capShown); }
   $('#iTrack').style.display = sel && (sel.kind === 'flight' || sel.kind === 'sat') ? '' : 'none';
@@ -316,7 +329,7 @@ function updateInfo() {
     rows = row('기종', (a.type || '–') + (a.desc ? ` <span style="color:var(--dim)">${a.desc}</span>` : '')) + row('등록번호', a.reg || '–') +
       row('고도', a.gnd ? '지상' : `${fmt(a.alt)} ft (${fmt(a.alt * FT)} m)`) + row('속도', `${fmt(a.gs)} kt (시속 ${fmt(a.gs * 1.852)} km)`) +
       row('방향', `${fmt(a.trk)}°`) + row('위치', `${C.Math.toDegrees(c.latitude).toFixed(3)}, ${C.Math.toDegrees(c.longitude).toFixed(3)}`) +
-      row('자료 시각', `${hhmm(a.t0 * 1000)}${LIVE ? '' : ' (약 10분마다 갱신)'}`);
+      row('자료 시각', `${hhmm(a.t0 * 1000)}${LIVE ? '' : ' · 지금 위치는 추정'}`);
   } else if (s.kind === 'sat') {
     const st = satList[s.key]; if (!st) return;
     const now = new Date(), pv = satellite.propagate(st.rec, now), gd = satellite.eciToGeodetic(pv.position, satellite.gstime(now));
@@ -344,8 +357,9 @@ const flightMap = new Map();
 let flightT = 0;
 const COL = { air: C.Color.fromCssColorString('#ffd25a'), mil: C.Color.fromCssColorString('#ff5f6d'), gnd: C.Color.fromCssColorString('#9fb3c8') };
 function flightPos(a, now) {
-  // 실시간(server.py)이면 받은 뒤 90초까지 속도·방향으로 앞으로 옮겨 그림. 묶음 자료(GitHub)는 받은 시각 위치 그대로.
-  const dt = a.gnd || !LIVE ? 0 : Math.min(90, Math.max(0, now - a.t0));
+  // 받은 시각부터 속도·방향으로 위치를 추정 (실시간 server.py는 90초, GitHub 묶음 자료는 10분까지).
+  // 지나온 길을 그릴 때는 과거(음수)도 허용.
+  const dt = a.gnd ? 0 : Math.min(LIVE ? 90 : 600, Math.max(-300, now - a.t0));
   const d = a.gs * KTS * dt, tr = C.Math.toRadians(a.trk);
   const lat = a.lat + (d * Math.cos(tr)) / 111320, lon = a.lon + (d * Math.sin(tr)) / (111320 * Math.cos(C.Math.toRadians(a.lat)));
   return C.Cartesian3.fromDegrees(lon, lat, a.gnd ? 5 : a.alt * FT);
@@ -377,7 +391,7 @@ async function loadFlights() {
     setStatus('f', `항공기 ${hhmm(d.t * 1000)} 기준 (adsb.lol)`);
   } catch (e) { setStatus('f', `항공기 자료를 받지 못함 (${e.message})`, true); }
 }
-scene.preRender.addEventListener(() => { if (LIVE && planes.show) { const now = Date.now() / 1000; for (const o of flightMap.values()) o.bb.position = flightPos(o, now); } });
+scene.preRender.addEventListener(() => { if (planes.show) { const now = Date.now() / 1000; for (const o of flightMap.values()) o.bb.position = flightPos(o, now); } });
 $('#L_flights').onchange = e => { planes.show = e.target.checked; if (e.target.checked) loadFlights(); };
 
 // ---------------- 인공위성 ----------------
@@ -561,10 +575,10 @@ async function useSats(T, g) { if ($('#satGroup').value !== g || !satList.length
 const SCENES = [
   async function korea(T) {
     reset(); flyTo(36.1, 127.9, 2.3e6 * AF()); await T.wait(2800); await T.do(loadFlights());
-    const sub = () => LIVE ? '노랑 비행 중 · 회색 지상 · 빨강 군용 표시<br>10초마다 새 위치' : `노랑 비행 중 · 회색 지상 · 빨강 군용 표시<br>${hhmm(flightT * 1000)} 기준 위치 (약 10분마다 갱신)`;
+    const sub = () => LIVE ? '노랑 비행 중 · 회색 지상 · 빨강 군용 표시<br>10초마다 새 위치' : `노랑 비행 중 · 회색 지상 · 빨강 군용<br>${hhmm(flightT * 1000)} 자료로 지금 위치를 추정`;
     await T.cap('실시간 항공기', '지금 한반도 하늘의 비행기', `${fmt(flightMap.size)}대`, sub(),
       '비행기는 자기 위치·고도·속도를 1초에 여러 번 전파로 알립니다(<b>ADS-B</b>). 세계 곳곳의 자원봉사 수신기가 이 신호를 모아 공개합니다.');
-    await T.live(24000, () => { $('#capBig').textContent = `${fmt(flightMap.size)}대`; }, 3000);
+    await T.live(14000, () => { $('#capBig').textContent = `${fmt(flightMap.size)}대`; }, 3000);
   },
   async function oneFlight(T) {
     reset();
@@ -577,7 +591,7 @@ const SCENES = [
     const sub = () => { const o = flightMap.get(a.id) || a; return `${o.type || '기종 미상'} · 고도 ${fmt(o.alt * FT)}m · 시속 ${fmt(o.gs * 1.852)}km<br>방향 ${fmt(o.trk)}° · 등록번호 ${o.reg || '–'}`; };
     await T.cap('비행기 따라가기', '지금 날고 있는 이 비행기', a.cs, sub(),
       '순항 고도 약 10km는 공기가 희박해 연료를 아낄 수 있는 높이입니다. 항공에서는 <b>1피트 = 0.3048m</b>, <b>1노트 = 시속 1.852km</b>를 씁니다.');
-    await T.live(26000, () => { $('#capSub').innerHTML = sub(); });
+    await T.live(16000, () => { $('#capSub').innerHTML = sub(); });
   },
   async function iss(T) {
     reset(); await useSats(T, 'stations');
@@ -590,7 +604,7 @@ const SCENES = [
     };
     await T.cap('국제우주정거장 ISS', '사람이 사는 우주 실험실', ...info(),
       '약 93분에 지구를 한 바퀴 돌아 하루에 해돋이를 16번 봅니다. 위성 위치는 <b>2줄 궤도요소(TLE)</b>와 궤도 계산식(SGP4)으로 구합니다.');
-    await T.live(28000, () => { const [b, s] = info(); $('#capBig').textContent = b; $('#capSub').innerHTML = s; });
+    await T.live(18000, () => { const [b, s] = info(); $('#capBig').textContent = b; $('#capSub').innerHTML = s; });
   },
   async function gps(T) {
     reset(); await useSats(T, 'gps-ops'); globe.enableLighting = false;
@@ -603,7 +617,7 @@ const SCENES = [
     const sub = () => `대구 하늘에 지금 보이는 위성 <b style="color:var(--acc2)">${vis()}개</b> (고도각 10° 이상)<br>고도 약 20,200km · 6개 궤도면에 나뉘어 돕니다`;
     await T.cap('측지정보과 · GNSS', '지구를 도는 GPS 위성', `${satList.length}개`, sub(),
       '수신기는 전파가 오는 시간으로 위성까지의 거리를 잽니다. 위성 <b>4개 이상</b>이면 위도·경도·높이와 수신기 시계 오차를 함께 풀 수 있습니다 — 측량에서 쓰는 GNSS의 원리입니다.');
-    await T.live(28000, () => { $('#capSub').innerHTML = sub(); }, 5000);
+    await T.live(18000, () => { $('#capSub').innerHTML = sub(); }, 5000);
   },
   async function quakes(T) {
     reset(); $('#qPeriod').value = 'day'; await T.do(loadQuakes()); globe.enableLighting = false;
@@ -612,7 +626,7 @@ const SCENES = [
     const sub = top ? `가장 큰 지진 규모 <b style="color:var(--acc2)">${top.mag.toFixed(1)}</b> · ${top.place}<br>${kst(top.time, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} (한국 시각) · 원 크기는 규모, 색은 깊이` : '자료를 받는 중입니다';
     await T.cap('미국 지질조사국 USGS', '최근 24시간 세계의 지진', `${f.length}건`, sub,
       '지진은 판의 경계에 몰려 있습니다 — 태평양을 둘러싼 <b>불의 고리</b>. 규모가 1 커지면 나오는 에너지는 약 <b>32배</b>가 됩니다.');
-    await T.wait(25000);
+    await T.wait(15000);
   },
   async function dayNight(T) {
     reset(); if (!launches.length) await T.do(loadLaunches());
@@ -622,7 +636,7 @@ const SCENES = [
     const sub = () => next ? `다음 로켓 발사 · ${next.name}<br>${next.provider} · <b style="color:var(--acc2)">${countdown(next.net)}</b>` : '밤 쪽에 보이는 불빛은 도시의 불빛입니다';
     await T.cap('실제 태양 위치', '지금 지구의 낮과 밤', '', sub(),
       '낮과 밤의 경계(명암 경계선)는 지구 자전 때문에 <b>1시간에 경도 15°</b>씩 서쪽으로 움직입니다. 그래서 경도 15°마다 표준시가 1시간씩 다릅니다.');
-    await T.live(26000, () => { $('#capSub').innerHTML = sub(); });
+    await T.live(16000, () => { $('#capSub').innerHTML = sub(); });
   },
 ];
 function runTour(start = tourIdx) {
@@ -644,7 +658,12 @@ function runTour(start = tourIdx) {
   })();
 }
 function stopTour() { if (!tourOn) return; tourGen++; tourOn = false; spin = 0; updTourBtn(); }
-function updTourBtn() { const b = $('#tourBtn'); b.classList.toggle('on', tourOn); b.innerHTML = tourOn ? '⏸<span class="lbl"> 둘러보기 멈춤</span>' : '▶<span class="lbl"> 자동 둘러보기</span>'; }
+function updTourBtn() {
+  const b = $('#tourBtn'); b.classList.toggle('on', tourOn);
+  b.textContent = tourOn ? (PHONE() ? '⏸ 멈춤' : '⏸ 둘러보기 멈춤') : (PHONE() ? '▶ 둘러보기' : '▶ 자동 둘러보기');
+}
+addEventListener('resize', () => updTourBtn());
+$('#capTip').onclick = () => $('#cap').classList.toggle('tipopen');
 function userTakeover() { if (tourOn) { stopTour(); stopTrack(); toast('직접 탐색 중 · ▶ 를 누르면 다시 자동으로 둘러봅니다'); } }
 $('#tourBtn').onclick = () => { if (tourOn) { stopTour(); toast('둘러보기를 멈췄습니다. 지구를 직접 돌려 보세요'); } else { closeSheet(); select(null, true); runTour(tourIdx); } };
 $('#nextBtn').onclick = () => { closeSheet(); runTour(tourIdx + 1); };
